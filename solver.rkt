@@ -230,39 +230,3 @@
      (solver-assert-skolemize #:label (symbol-append name '- other-name) formula)]
     [_ (solver-assert #:label (symbol-append name '- (gensym)) formula)]))
 
-(define (quantifier-free e)
-  (match e
-    [`(forall ,vars ,body) #f]
-    [`(exists ,vars ,body) #f]
-    [`(and ,args ...) (andmap quantifier-free args)]
-    [`(or ,args ...) (andmap quantifier-free args)]
-    [`(=> ,e1 ,e2) (and (quantifier-free e1) (quantifier-free e2))]
-    [`(not ,e) (quantifier-free e)]
-    [_ #t]))
-
-(define (quantifier-alternations expr)
-  (define (go env e)
-    (match e
-      [`(forall ,vars ,body)
-       (go (append env vars) body)]
-      [`(exists ,vars ,body)
-       (stream-append
-        (for*/stream ([x env]
-                      [y vars])
-          (match (list x y)
-            [(list (list x xsort) (list y ysort))
-             (list xsort ysort (list x y))]))
-        (go env body))]
-      [`(and ,args ...)
-       (apply stream-append (map (λ (e) (go env e)) args))]
-      [`(or ,args ...)
-       (apply stream-append (map (λ (e) (go env e)) args))]
-      [`(=> ,e1 ,e2)
-       (go env (solver-or (solver-not e1) e2))]
-      [e
-       (unless (quantifier-free e)
-         (error (format "unexpected expression while analyzing quantifier alternations: ~a" e)))
-       empty-stream]))
-
-  (go '() expr))
-
